@@ -5,9 +5,14 @@ import android.os.Bundle
 import android.text.Spannable
 import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
+import android.view.LayoutInflater
 import android.view.View
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.view.isVisible
+import androidx.room.Room
+import com.example.kotlinproject4calculation.Model.historyModel
 import java.lang.NumberFormatException
 
 class MainActivity : AppCompatActivity() {
@@ -22,9 +27,25 @@ class MainActivity : AppCompatActivity() {
     private var isOperator = false
     private var hasOperator = false
 
+    private val historyLayout: View by lazy{
+        findViewById<View>(R.id.historyLayout)
+    }
+    private val historyLinearLayout:LinearLayout by lazy{
+        findViewById<LinearLayout>(R.id.historyLinearLayout)
+    }
+
+    lateinit var db:appDataBase
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        //onCreate 될 때, db에 DataBase 저장
+        db = Room.databaseBuilder(
+            applicationContext,
+            appDataBase::class.java,
+            "historyDB"
+        ).build()
     }
 
     fun ButtonClicked(v: View) {
@@ -124,10 +145,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun historyButtonClicked(v: View) {
-
-    }
-
     fun resultButtonClicked(v: View) {
         val expressionTexts = expressionTextView.text.split(" ")
 
@@ -150,6 +167,11 @@ class MainActivity : AppCompatActivity() {
         expressionTextView.text = resultText
         isOperator = false
         hasOperator = false
+
+        //TODO DB에 저장
+        Thread(Runnable {
+            db.historyDao().insertHistory(historyModel(null,expressionText,resultText))
+        }).start()
     }
 
     fun clearButtonClicked(v: View) {
@@ -157,6 +179,36 @@ class MainActivity : AppCompatActivity() {
         resultTextView.text = ""
         isOperator = false
         hasOperator = false
+    }
+
+    fun historyButtonClicked(v: View) {
+        historyLayout.isVisible = true
+        historyLinearLayout.removeAllViews()
+        //TODO Local DB에서 값 가져오기
+        Thread(Runnable{
+            db.historyDao().getAll().reversed().forEach{
+                runOnUiThread{
+                    val historyView = LayoutInflater.from(this).inflate(R.layout.history_row,null,false)
+
+                    historyView.findViewById<TextView>(R.id.expressionTextView).text = it.expression
+                    historyView.findViewById<TextView>(R.id.resultTextView).text = " = ${it.result}"
+
+                    historyLinearLayout.addView(historyView)
+                }
+            }
+        }).start()
+    }
+
+    fun closeButtonClicked(v:View){
+        historyLayout.isVisible = false
+    }
+
+    fun removeHistoryButtonClicked(v:View){
+
+        historyLinearLayout.removeAllViews()
+        Thread(Runnable {
+            db.historyDao().deleteAll()
+        }).start()
     }
 }
 
